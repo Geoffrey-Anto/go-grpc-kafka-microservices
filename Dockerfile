@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY ./ ./
 
-ENV PORT 8080
+ENV PORT 3002
 
 RUN go build -o ./server-exec
 
