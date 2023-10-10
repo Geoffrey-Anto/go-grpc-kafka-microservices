@@ -9,10 +9,8 @@ RUN go mod download
 
 COPY ./ ./
 
-RUN mkdir bin
-
 ENV PORT 8080
 
-RUN go build -o ./bin/server
+RUN go build -o ./server-exec
 
-CMD ["./bin/server"]
+CMD ["./server-exec"]
