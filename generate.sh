@@ -1,5 +1,11 @@
 echo "Generating Proto files"
 
-protoc -I protos/ protos/logger.proto --go_out=plugins=grpc:protos
+protoc --go_out=. --go_opt=paths=source_relative \
+--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+protos/logger.proto
+
+protoc --go_out=. --go_opt=paths=source_relative \
+--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+protos/randomjoke.proto
 
 echo "Generated Files"

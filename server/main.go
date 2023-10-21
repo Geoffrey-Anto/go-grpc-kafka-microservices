@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pb "server/protos"
+	pb "server/protos/logger"
 
 	"os"
 	"strconv"
@@ -58,11 +58,22 @@ func (s *Server) RunServer() {
 			log.Fatalf("could not log: %v", err)
 		}
 		log.Printf("Log Success: %v", r.Success)
-
 		return c.Render("index", fiber.Map{})
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		r, err := LoggerClient.SaveLog(ctx, &pb.LogSaveRequest{
+			Id:   c.IP(),
+			Time: time.Now().String(),
+			Log:  "GET /health",
+		})
+		if err != nil {
+			log.Fatalf("could not log: %v", err)
+		}
+		log.Printf("Log Success: %v", r.Success)
+
 		c.SendString("OK")
 		return c.SendStatus(200)
 	})

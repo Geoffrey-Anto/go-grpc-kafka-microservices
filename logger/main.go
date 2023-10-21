@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "logger/protos"
+	pb "logger/protos/logger"
 )
 
 var (
