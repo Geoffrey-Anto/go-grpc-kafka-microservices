@@ -1,1 +1,5 @@
-protoc -I=protos --go_out=plugins=grpc:logger protos/logger.proto
+echo "Generating Proto files"
+
+protoc -I protos/ protos/logger.proto --go_out=plugins=grpc:protos
+
+echo "Generated Files"
