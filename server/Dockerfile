@@ -1,7 +1,7 @@
 FROM golang:1.21
 
 # Set destination for COPY
-WORKDIR /app
+WORKDIR /server
 
 # Download Go modules
 COPY go.mod go.sum ./
@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY ./ ./
 
-ENV PORT 3002
+EXPOSE ${PORT}
 
 RUN go build -o ./server-exec
 
