@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"context"
@@ -11,7 +11,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pb "github.com/geoffrey-anto/golang-microservice-apis/protos"
+	pb "server/protos"
+
+	"os"
+	"strconv"
 )
 
 type Server struct {
@@ -19,7 +22,7 @@ type Server struct {
 	port int
 }
 
-func NewServer(addr string, port int) *Server {
+func newServer(addr string, port int) *Server {
 	return &Server{
 		port: port,
 		addr: addr,
@@ -32,16 +35,17 @@ func (s *Server) RunServer() {
 		Views: engine,
 	})
 
+	conn, err := grpc.Dial(
+		os.Getenv("GRPC_LOGGER_HOST"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	LoggerClient := pb.NewLoggerClient(conn)
+
 	app.Get("/", func(c *fiber.Ctx) error {
-		conn, err := grpc.Dial(
-			"localhost:50051",
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		defer conn.Close()
-		LoggerClient := pb.NewLoggerClient(conn)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -63,8 +67,18 @@ func (s *Server) RunServer() {
 		return c.SendStatus(200)
 	})
 
-	err := app.Listen(fmt.Sprint(s.addr, ":", s.port))
+	err = app.Listen(fmt.Sprint(s.addr, ":", s.port))
 	if err != nil {
 		log.Fatalf("Error on opening port")
 	}
+}
+
+func main() {
+	PORT, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil {
+		log.Fatalf("Error on parsing port")
+	}
+
+	s := newServer("0.0.0.0", PORT)
+	s.RunServer()
 }

@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/geoffrey-anto/golang-microservice-apis/protos"
+	pb "logger/protos"
 )
 
 var (
@@ -27,14 +27,14 @@ func (s *server) SaveLog(ctx context.Context, in *pb.LogSaveRequest) (*pb.LogSav
 	if file == nil {
 		return &pb.LogSaveRespone{
 			Success: false,
-		}, fmt.Errorf("No file found")
+		}, fmt.Errorf("no file found")
 	}
 
 	_, err := file.WriteString(fmt.Sprintf("%+v     %+v     %+v\n", in.Id, in.Log, in.Time))
 	if err != nil {
 		return &pb.LogSaveRespone{
 			Success: false,
-		}, fmt.Errorf("Error in running file")
+		}, fmt.Errorf("error in running file")
 	}
 
 	return &pb.LogSaveRespone{
