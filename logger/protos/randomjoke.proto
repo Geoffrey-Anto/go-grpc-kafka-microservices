@@ -3,7 +3,7 @@ syntax = "proto3";
 option go_package = "github.com/geoffrey-anto/golang-microservice-apis/randomjoke";
 
 service RandomJokeService {
-    rpc GetRandomJoke (RandomJokeRequest) returns (stream RandomJokeResponse);
+    rpc GetRandomJoke (RandomJokeRequest) returns (RandomJokeResponse);
 }
 
 message RandomJokeRequest {

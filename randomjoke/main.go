@@ -1,28 +1,31 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	pb "server/protos/randomjoke"
-	"time"
 
 	"google.golang.org/grpc"
+
+	pb "randomjoke/protos/randomjoke"
 )
 
-var (
-	port = flag.Int("port", 50052, "The server port")
-)
+var port = flag.Int("port", 50052, "The server port")
 
 type server struct {
 	pb.UnimplementedRandomJokeServiceServer
 }
 
-func (s *server) GetRandomJoke(in *pb.RandomJokeRequest, stream pb.RandomJokeService_GetRandomJokeServer) error {
+func (s *server) GetRandomJoke(
+	ctx context.Context,
+	in *pb.RandomJokeRequest,
+) (*pb.RandomJokeResponse, error) {
 	for {
-		stream.Send(&pb.RandomJokeResponse{Joke: "This is a joke"})
-		time.Sleep(time.Duration(in.Timeout) * time.Second)
+		return &pb.RandomJokeResponse{
+			Joke: "My sea sickness comes in waves.",
+		}, nil
 	}
 }
 

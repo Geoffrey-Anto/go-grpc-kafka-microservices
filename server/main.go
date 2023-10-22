@@ -11,10 +11,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pb "server/protos/logger"
+	pbLogger "server/protos/logger"
+	pbRandomJoke "server/protos/randomjoke"
 
 	"os"
 	"strconv"
+
+	"server/handler"
 )
 
 type Server struct {
@@ -29,56 +32,39 @@ func newServer(addr string, port int) *Server {
 	}
 }
 
-func (s *Server) RunServer() {
+func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient pbRandomJoke.RandomJokeServiceClient) {
 	engine := html.New("./views", ".html")
 	app := fiber.New(fiber.Config{
 		Views: engine,
 	})
 
-	conn, err := grpc.Dial(
-		os.Getenv("GRPC_LOGGER_HOST"),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	LoggerClient := pb.NewLoggerClient(conn)
-
-	app.Get("/", func(c *fiber.Ctx) error {
-
+	app.Use(func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		r, err := LoggerClient.SaveLog(ctx, &pb.LogSaveRequest{
+		_, err := LoggerClient.SaveLog(ctx, &pbLogger.LogSaveRequest{
 			Id:   c.IP(),
 			Time: time.Now().String(),
-			Log:  "GET /",
+			Log:  c.Path(),
 		})
 		if err != nil {
 			log.Fatalf("could not log: %v", err)
 		}
-		log.Printf("Log Success: %v", r.Success)
-		return c.Render("index", fiber.Map{})
+		return c.Next()
+	})
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return handler.MainHandler(c)
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		r, err := LoggerClient.SaveLog(ctx, &pb.LogSaveRequest{
-			Id:   c.IP(),
-			Time: time.Now().String(),
-			Log:  "GET /health",
-		})
-		if err != nil {
-			log.Fatalf("could not log: %v", err)
-		}
-		log.Printf("Log Success: %v", r.Success)
-
-		c.SendString("OK")
-		return c.SendStatus(200)
+		return handler.HealthHandler(c)
 	})
 
-	err = app.Listen(fmt.Sprint(s.addr, ":", s.port))
+	app.Post("/random-joke", func(c *fiber.Ctx) error {
+		return handler.RandomJokeHandler(c, RandomJokeClient)
+	})
+
+	err := app.Listen(fmt.Sprint(s.addr, ":", s.port))
 	if err != nil {
 		log.Fatalf("Error on opening port")
 	}
@@ -90,6 +76,29 @@ func main() {
 		log.Fatalf("Error on parsing port")
 	}
 
+	loggerConn, err := grpc.Dial(
+		os.Getenv("GRPC_LOGGER_HOST"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer loggerConn.Close()
+	LoggerClient := pbLogger.NewLoggerClient(loggerConn)
+
+	randomJokeConn, err := grpc.Dial(
+		os.Getenv("GRPC_RANDOMJOKE_HOST"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+
+	defer randomJokeConn.Close()
+
+	RandomJokeClient := pbRandomJoke.NewRandomJokeServiceClient(randomJokeConn)
+
 	s := newServer("0.0.0.0", PORT)
-	s.RunServer()
+	s.RunServer(LoggerClient, RandomJokeClient)
 }

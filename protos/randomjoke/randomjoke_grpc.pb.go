@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RandomJokeServiceClient interface {
-	GetRandomJoke(ctx context.Context, in *RandomJokeRequest, opts ...grpc.CallOption) (RandomJokeService_GetRandomJokeClient, error)
+	GetRandomJoke(ctx context.Context, in *RandomJokeRequest, opts ...grpc.CallOption) (*RandomJokeResponse, error)
 }
 
 type randomJokeServiceClient struct {
@@ -37,43 +37,20 @@ func NewRandomJokeServiceClient(cc grpc.ClientConnInterface) RandomJokeServiceCl
 	return &randomJokeServiceClient{cc}
 }
 
-func (c *randomJokeServiceClient) GetRandomJoke(ctx context.Context, in *RandomJokeRequest, opts ...grpc.CallOption) (RandomJokeService_GetRandomJokeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &RandomJokeService_ServiceDesc.Streams[0], RandomJokeService_GetRandomJoke_FullMethodName, opts...)
+func (c *randomJokeServiceClient) GetRandomJoke(ctx context.Context, in *RandomJokeRequest, opts ...grpc.CallOption) (*RandomJokeResponse, error) {
+	out := new(RandomJokeResponse)
+	err := c.cc.Invoke(ctx, RandomJokeService_GetRandomJoke_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &randomJokeServiceGetRandomJokeClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type RandomJokeService_GetRandomJokeClient interface {
-	Recv() (*RandomJokeResponse, error)
-	grpc.ClientStream
-}
-
-type randomJokeServiceGetRandomJokeClient struct {
-	grpc.ClientStream
-}
-
-func (x *randomJokeServiceGetRandomJokeClient) Recv() (*RandomJokeResponse, error) {
-	m := new(RandomJokeResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 // RandomJokeServiceServer is the server API for RandomJokeService service.
 // All implementations must embed UnimplementedRandomJokeServiceServer
 // for forward compatibility
 type RandomJokeServiceServer interface {
-	GetRandomJoke(*RandomJokeRequest, RandomJokeService_GetRandomJokeServer) error
+	GetRandomJoke(context.Context, *RandomJokeRequest) (*RandomJokeResponse, error)
 	mustEmbedUnimplementedRandomJokeServiceServer()
 }
 
@@ -81,8 +58,8 @@ type RandomJokeServiceServer interface {
 type UnimplementedRandomJokeServiceServer struct {
 }
 
-func (UnimplementedRandomJokeServiceServer) GetRandomJoke(*RandomJokeRequest, RandomJokeService_GetRandomJokeServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetRandomJoke not implemented")
+func (UnimplementedRandomJokeServiceServer) GetRandomJoke(context.Context, *RandomJokeRequest) (*RandomJokeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRandomJoke not implemented")
 }
 func (UnimplementedRandomJokeServiceServer) mustEmbedUnimplementedRandomJokeServiceServer() {}
 
@@ -97,25 +74,22 @@ func RegisterRandomJokeServiceServer(s grpc.ServiceRegistrar, srv RandomJokeServ
 	s.RegisterService(&RandomJokeService_ServiceDesc, srv)
 }
 
-func _RandomJokeService_GetRandomJoke_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(RandomJokeRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _RandomJokeService_GetRandomJoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RandomJokeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(RandomJokeServiceServer).GetRandomJoke(m, &randomJokeServiceGetRandomJokeServer{stream})
-}
-
-type RandomJokeService_GetRandomJokeServer interface {
-	Send(*RandomJokeResponse) error
-	grpc.ServerStream
-}
-
-type randomJokeServiceGetRandomJokeServer struct {
-	grpc.ServerStream
-}
-
-func (x *randomJokeServiceGetRandomJokeServer) Send(m *RandomJokeResponse) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(RandomJokeServiceServer).GetRandomJoke(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RandomJokeService_GetRandomJoke_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RandomJokeServiceServer).GetRandomJoke(ctx, req.(*RandomJokeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // RandomJokeService_ServiceDesc is the grpc.ServiceDesc for RandomJokeService service.
@@ -124,13 +98,12 @@ func (x *randomJokeServiceGetRandomJokeServer) Send(m *RandomJokeResponse) error
 var RandomJokeService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "RandomJokeService",
 	HandlerType: (*RandomJokeServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
-	Streams: []grpc.StreamDesc{
+	Methods: []grpc.MethodDesc{
 		{
-			StreamName:    "GetRandomJoke",
-			Handler:       _RandomJokeService_GetRandomJoke_Handler,
-			ServerStreams: true,
+			MethodName: "GetRandomJoke",
+			Handler:    _RandomJokeService_GetRandomJoke_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "protos/randomjoke.proto",
 }
