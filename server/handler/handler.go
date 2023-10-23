@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -35,4 +36,13 @@ func RandomJokeHandler(c *fiber.Ctx, RandomJokeClient pbRandomJoke.RandomJokeSer
 
 	c.SendString(r.Joke)
 	return c.SendStatus(200)
+}
+
+func GetHost(c *fiber.Ctx) error {
+	host, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	c.SendString(host)
+	return nil
 }

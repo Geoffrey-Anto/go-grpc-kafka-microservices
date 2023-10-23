@@ -4,8 +4,9 @@ services:
     build: ./server
     depends_on:
       - logger-service
-    ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
+      - randomjoke-service
+    # ports:
+    #   - "${SERVER_PORT}:${SERVER_PORT}"
     volumes:
       - ./server:/usr/src/server
     environment:
@@ -14,12 +15,12 @@ services:
       - GRPC_RANDOMJOKE_HOST=randomjoke-service:${RANDOMJOKE_PORT}
     restart: always
     networks:
-      my-net:
-        ipv4_address: "192.168.96.10"
+      - my-net
+    scale: 3
   logger-service:
     build: ./logger
-    ports:
-      - "${LOGGER_PORT}:${LOGGER_PORT}"
+    # ports:
+    #   - "${LOGGER_PORT}:${LOGGER_PORT}"
     volumes:
       - ./logger:/usr/src/logger
     environment:
@@ -30,8 +31,8 @@ services:
         ipv4_address: "192.168.96.20"
   randomjoke-service:
     build: ./randomjoke
-    ports:
-      - "${RANDOMJOKE_PORT}:${RANDOMJOKE_PORT}"
+    # ports:
+    #   - "${RANDOMJOKE_PORT}:${RANDOMJOKE_PORT}"
     volumes:
       - ./randomjoke:/usr/src/randomjoke
     environment:
@@ -40,6 +41,15 @@ services:
     networks:
       my-net:
         ipv4_address: "192.168.96.30"
+  nginx:
+    build: ./nginx
+    ports:
+      - "8080:${NGINX_PORT}"
+    depends_on:
+      - server
+    networks:
+      - my-net
+    restart: always
 networks:
   my-net:
     ipam:

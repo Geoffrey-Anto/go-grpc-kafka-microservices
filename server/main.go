@@ -64,6 +64,10 @@ func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient 
 		return handler.RandomJokeHandler(c, RandomJokeClient)
 	})
 
+	app.Get("/host", func(c *fiber.Ctx) error {
+		return handler.GetHost(c)
+	})
+
 	err := app.Listen(fmt.Sprint(s.addr, ":", s.port))
 	if err != nil {
 		log.Fatalf("Error on opening port")
