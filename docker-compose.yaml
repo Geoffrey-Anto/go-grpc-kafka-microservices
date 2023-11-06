@@ -16,7 +16,7 @@ services:
     restart: always
     networks:
       - my-net
-    scale: 3
+    scale: 1
   logger-service:
     build: ./logger
     # ports:
