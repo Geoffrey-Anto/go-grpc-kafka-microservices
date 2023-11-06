@@ -44,7 +44,7 @@ services:
   nginx:
     build: ./nginx
     ports:
-      - "8080:${NGINX_PORT}"
+      - "3001:${NGINX_PORT}"
     depends_on:
       - server
     networks:
