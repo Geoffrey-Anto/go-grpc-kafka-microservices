@@ -2,6 +2,7 @@
 
 ### Build
 ```bash
+cp .env.example .env
 sudo docker compose build
 ```
 
