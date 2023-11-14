@@ -1,7 +1,7 @@
 FROM golang:1.21
 
 # Set destination for COPY
-WORKDIR /logger
+WORKDIR /logger-decoupled
 
 # Download Go modules
 COPY go.mod go.sum ./
@@ -11,9 +11,9 @@ COPY ./ ./
 
 EXPOSE ${PORT}
 
-RUN go build -o ./logger-exec
+RUN go build -o ./logger-decoupled-exec
 
-RUN chmod +x ./logger-exec
+RUN chmod +x ./logger-decoupled-exec
 
-CMD ./logger-exec --port $PORT
+CMD ./logger-decoupled-exec
 

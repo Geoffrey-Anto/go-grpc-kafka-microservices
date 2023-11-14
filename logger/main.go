@@ -1,52 +1,32 @@
 package main
 
 import (
-	"context"
-	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 
-	"google.golang.org/grpc"
-
-	pb "logger/protos/logger"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
-
-var (
-	port          = flag.Int("port", 50051, "The server port")
-	file *os.File = nil
-)
-
-type server struct {
-	pb.UnimplementedLoggerServer
-}
-
-func (s *server) SaveLog(ctx context.Context, in *pb.LogSaveRequest) (*pb.LogSaveRespone, error) {
-	fmt.Printf("%+v     %+v     %+v\n", in.Id, in.Log, in.Time)
-	if file == nil {
-		return &pb.LogSaveRespone{
-			Success: false,
-		}, fmt.Errorf("no file found")
-	}
-
-	_, err := file.WriteString(fmt.Sprintf("%+v     %+v     %+v\n", in.Id, in.Log, in.Time))
-	if err != nil {
-		return &pb.LogSaveRespone{
-			Success: false,
-		}, fmt.Errorf("error in running file")
-	}
-
-	return &pb.LogSaveRespone{
-		Success: true,
-	}, nil
-}
 
 func main() {
-	flag.Parse()
+	kafkaServer := os.Getenv("KAFKA_SERVER")
+	kafkaTopic := os.Getenv("KAFKA_TOPIC")
+	groupID := os.Getenv("KAFKA_GROUP_ID")
+	config := kafka.ConfigMap{"bootstrap.servers": kafkaServer, "group.id": groupID, "go.events.channel.enable": true}
+	consumer, consumerCreateErr := kafka.NewConsumer(&config)
+	if consumerCreateErr != nil {
+		fmt.Println("consumer not created ", consumerCreateErr.Error())
+		os.Exit(1)
+	}
+	subscriptionErr := consumer.Subscribe(kafkaTopic, nil)
+	if subscriptionErr != nil {
+		fmt.Println("Unable to subscribe to topic " + kafkaTopic + " due to error - " + subscriptionErr.Error())
+		os.Exit(1)
+	} else {
+		fmt.Println("subscribed to topic ", kafkaTopic)
+	}
 
 	f, err := os.Create("./logs/logs.txt")
-	file = f
 
 	if err != nil {
 		log.Fatalf("Error in creating file")
@@ -54,17 +34,26 @@ func main() {
 
 	defer f.Close()
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+	for {
+		fmt.Println("waiting for event...")
+		kafkaEvent := <-consumer.Events()
+		if kafkaEvent != nil {
+			switch event := kafkaEvent.(type) {
+			case *kafka.Message:
+				_, err := f.WriteString(fmt.Sprintf("%+v\n", string(event.Value)))
+				if err != nil {
+					fmt.Println("Error in writing to file ", err.Error())
+				}
+			case kafka.Error:
+				fmt.Println("Consumer error ", event.String())
+			case kafka.PartitionEOF:
+				fmt.Println(kafkaEvent)
+			default:
+				fmt.Println(kafkaEvent)
+			}
+		} else {
+			fmt.Println("Event was null")
+		}
 	}
-	s := grpc.NewServer()
 
-	pb.RegisterLoggerServer(s, &server{})
-
-	log.Printf("server listening at %v", lis.Addr())
-
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
 }

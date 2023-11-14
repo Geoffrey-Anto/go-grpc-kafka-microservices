@@ -5,36 +5,23 @@ services:
     depends_on:
       - logger-service
       - randomjoke-service
-      - logger-decoupled-service
     volumes:
       - ./server:/usr/src/server
     environment:
       - PORT=${SERVER_PORT}
-      - GRPC_LOGGER_HOST=logger-service:${LOGGER_PORT}
       - GRPC_RANDOMJOKE_HOST=randomjoke-service:${RANDOMJOKE_PORT}
       - KAFKA_TOPIC=${KAFKATOPIC}
       - KAFKA_SERVER=kafka:${KAFKASERVER}
     restart: always
     networks:
-      my-net:
-        ipv4_address: "192.168.96.3"
-    scale: 1
+      - my-net
+        # ipv4_address: "192.168.96.3"
+    scale: 3
   logger-service:
     build: ./logger
     volumes:
       - ./logger:/usr/src/logger
     environment:
-      - PORT=${LOGGER_PORT}
-    restart: always
-    networks:
-      my-net:
-        ipv4_address: "192.168.96.20"
-  logger-decoupled-service:
-    build: ./logger-decoupled
-    volumes:
-      - ./logger-decoupled:/usr/src/logger-decoupled
-    environment:
-      - PORT=${LOGGER_DECOUPLED_PORT}
       - KAFKA_TOPIC=${KAFKATOPIC}
       - KAFKA_SERVER=kafka:${KAFKASERVER}
       - KAFKA_GROUP_ID=${KAFKAGROUPID}
@@ -43,13 +30,15 @@ services:
       - kafka
     networks:
       my-net:
-        ipv4_address: "192.168.96.22"
+        ipv4_address: "192.168.96.20"
   randomjoke-service:
     build: ./randomjoke
     volumes:
       - ./randomjoke:/usr/src/randomjoke
     environment:
       - PORT=${RANDOMJOKE_PORT}
+    ports:
+      - "51051:${RANDOMJOKE_PORT}"
     restart: always
     networks:
       my-net:
@@ -62,7 +51,7 @@ services:
       - server
     networks:
       my-net:
-        ipv4_address: "192.168.96.2"
+        ipv4_address: "192.168.96.254"
     restart: always
   zookeeper:
     image: confluentinc/cp-zookeeper:latest

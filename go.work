@@ -5,5 +5,3 @@ use logger
 use server
 
 use randomjoke
-
-use logger-decoupled

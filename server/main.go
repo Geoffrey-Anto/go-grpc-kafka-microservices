@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pbLogger "server/protos/logger"
 	pbRandomJoke "server/protos/randomjoke"
 
 	"os"
@@ -32,28 +31,13 @@ func newServer(addr string, port int) *Server {
 	}
 }
 
-func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient pbRandomJoke.RandomJokeServiceClient, producer *kafka.Producer) {
+func (s *Server) RunServer(RandomJokeClient pbRandomJoke.RandomJokeServiceClient, logSaveProducer *kafka.Producer) {
 	engine := html.New("./views", ".html")
 	app := fiber.New(fiber.Config{
 		Views: engine,
 	})
 
 	app.Use(func(c *fiber.Ctx) error {
-		// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		// defer cancel()
-		// ip_addr := c.Request().Header.Peek("X-Forwarded-For")
-		// if ip_addr == nil {
-		// 	ip_addr = []byte("unknown")
-		// }
-		// _, err := LoggerClient.SaveLog(ctx, &pbLogger.LogSaveRequest{
-		// 	Id:   string(ip_addr[:]),
-		// 	Time: time.Now().String(),
-		// 	Log:  c.Path(),
-		// })
-		// if err != nil {
-		// 	log.Fatalf("could not log: %v", err)
-		// }
-
 		kafkaTopic := os.Getenv("KAFKA_TOPIC")
 
 		ip_addr := c.Request().Header.Peek("X-Forwarded-For")
@@ -72,7 +56,7 @@ func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient 
 			ip_addr_str,
 		)
 
-		producerErr := producer.Produce(&kafka.Message{
+		producerErr := logSaveProducer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &kafkaTopic, Partition: kafka.PartitionAny},
 			Value:          []byte(value),
 		}, nil)
@@ -80,9 +64,13 @@ func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient 
 		if producerErr != nil {
 			fmt.Println("unable to enqueue message")
 		}
-		event := <-producer.Events()
+		event := <-logSaveProducer.Events()
 
-		message := event.(*kafka.Message)
+		message, err := event.(*kafka.Message)
+
+		if !err {
+			fmt.Println("unable to cast event")
+		}
 
 		if message.TopicPartition.Error != nil {
 			fmt.Println("Delivery failed due to error ", message.TopicPartition.Error)
@@ -120,16 +108,6 @@ func main() {
 		log.Fatalf("Error on parsing port")
 	}
 
-	loggerConn, err := grpc.Dial(
-		os.Getenv("GRPC_LOGGER_HOST"),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer loggerConn.Close()
-	LoggerClient := pbLogger.NewLoggerClient(loggerConn)
-
 	randomJokeConn, err := grpc.Dial(
 		os.Getenv("GRPC_RANDOMJOKE_HOST"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -153,5 +131,5 @@ func main() {
 	}
 
 	s := newServer("0.0.0.0", PORT)
-	s.RunServer(LoggerClient, RandomJokeClient, producer)
+	s.RunServer(RandomJokeClient, producer)
 }
