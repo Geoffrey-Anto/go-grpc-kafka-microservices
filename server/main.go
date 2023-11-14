@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
 	"google.golang.org/grpc"
@@ -32,22 +32,62 @@ func newServer(addr string, port int) *Server {
 	}
 }
 
-func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient pbRandomJoke.RandomJokeServiceClient) {
+func (s *Server) RunServer(LoggerClient pbLogger.LoggerClient, RandomJokeClient pbRandomJoke.RandomJokeServiceClient, producer *kafka.Producer) {
 	engine := html.New("./views", ".html")
 	app := fiber.New(fiber.Config{
 		Views: engine,
 	})
 
 	app.Use(func(c *fiber.Ctx) error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		_, err := LoggerClient.SaveLog(ctx, &pbLogger.LogSaveRequest{
-			Id:   c.IP(),
-			Time: time.Now().String(),
-			Log:  c.Path(),
-		})
-		if err != nil {
-			log.Fatalf("could not log: %v", err)
+		// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		// defer cancel()
+		// ip_addr := c.Request().Header.Peek("X-Forwarded-For")
+		// if ip_addr == nil {
+		// 	ip_addr = []byte("unknown")
+		// }
+		// _, err := LoggerClient.SaveLog(ctx, &pbLogger.LogSaveRequest{
+		// 	Id:   string(ip_addr[:]),
+		// 	Time: time.Now().String(),
+		// 	Log:  c.Path(),
+		// })
+		// if err != nil {
+		// 	log.Fatalf("could not log: %v", err)
+		// }
+
+		kafkaTopic := os.Getenv("KAFKA_TOPIC")
+
+		ip_addr := c.Request().Header.Peek("X-Forwarded-For")
+		if ip_addr == nil {
+			ip_addr = []byte("unknown")
+		}
+
+		ip_addr_str := string(ip_addr[:])
+
+		value := fmt.Sprintf(
+			"%+v, %+v, %+v at %+v from %+v\n",
+			c.Hostname(),
+			c.Path(),
+			c.Method(),
+			time.Now().String(),
+			ip_addr_str,
+		)
+
+		producerErr := producer.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &kafkaTopic, Partition: kafka.PartitionAny},
+			Value:          []byte(value),
+		}, nil)
+
+		if producerErr != nil {
+			fmt.Println("unable to enqueue message")
+		}
+		event := <-producer.Events()
+
+		message := event.(*kafka.Message)
+
+		if message.TopicPartition.Error != nil {
+			fmt.Println("Delivery failed due to error ", message.TopicPartition.Error)
+		} else {
+			fmt.Println("Delivered message to offset " + message.TopicPartition.Offset.String() + " in partition " + message.TopicPartition.String())
 		}
 		return c.Next()
 	})
@@ -103,6 +143,15 @@ func main() {
 
 	RandomJokeClient := pbRandomJoke.NewRandomJokeServiceClient(randomJokeConn)
 
+	kafkaServer := os.Getenv("KAFKA_SERVER")
+
+	producer, producerCreateErr := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": kafkaServer})
+
+	if producerCreateErr != nil {
+		fmt.Println("Failed to create producer due to ", producerCreateErr)
+		os.Exit(1)
+	}
+
 	s := newServer("0.0.0.0", PORT)
-	s.RunServer(LoggerClient, RandomJokeClient)
+	s.RunServer(LoggerClient, RandomJokeClient, producer)
 }

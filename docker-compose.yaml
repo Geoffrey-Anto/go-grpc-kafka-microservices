@@ -5,22 +5,22 @@ services:
     depends_on:
       - logger-service
       - randomjoke-service
-    # ports:
-    #   - "${SERVER_PORT}:${SERVER_PORT}"
+      - logger-decoupled-service
     volumes:
       - ./server:/usr/src/server
     environment:
       - PORT=${SERVER_PORT}
       - GRPC_LOGGER_HOST=logger-service:${LOGGER_PORT}
       - GRPC_RANDOMJOKE_HOST=randomjoke-service:${RANDOMJOKE_PORT}
+      - KAFKA_TOPIC=${KAFKATOPIC}
+      - KAFKA_SERVER=kafka:${KAFKASERVER}
     restart: always
     networks:
-      - my-net
+      my-net:
+        ipv4_address: "192.168.96.3"
     scale: 1
   logger-service:
     build: ./logger
-    # ports:
-    #   - "${LOGGER_PORT}:${LOGGER_PORT}"
     volumes:
       - ./logger:/usr/src/logger
     environment:
@@ -29,10 +29,23 @@ services:
     networks:
       my-net:
         ipv4_address: "192.168.96.20"
+  logger-decoupled-service:
+    build: ./logger-decoupled
+    volumes:
+      - ./logger-decoupled:/usr/src/logger-decoupled
+    environment:
+      - PORT=${LOGGER_DECOUPLED_PORT}
+      - KAFKA_TOPIC=${KAFKATOPIC}
+      - KAFKA_SERVER=kafka:${KAFKASERVER}
+      - KAFKA_GROUP_ID=${KAFKAGROUPID}
+    restart: always
+    depends_on:
+      - kafka
+    networks:
+      my-net:
+        ipv4_address: "192.168.96.22"
   randomjoke-service:
     build: ./randomjoke
-    # ports:
-    #   - "${RANDOMJOKE_PORT}:${RANDOMJOKE_PORT}"
     volumes:
       - ./randomjoke:/usr/src/randomjoke
     environment:
@@ -40,7 +53,7 @@ services:
     restart: always
     networks:
       my-net:
-        ipv4_address: "192.168.96.30"
+        ipv4_address: "192.168.96.21"
   nginx:
     build: ./nginx
     ports:
@@ -48,8 +61,35 @@ services:
     depends_on:
       - server
     networks:
-      - my-net
+      my-net:
+        ipv4_address: "192.168.96.2"
     restart: always
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+    networks:
+      my-net:
+        ipv4_address: "192.168.96.100"
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      my-net:
+        ipv4_address: "192.168.96.101"
 networks:
   my-net:
     ipam:
